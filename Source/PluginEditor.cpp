@@ -246,12 +246,18 @@ GAcidBaseEditor::GAcidBaseEditor(GAcidBaseProcessor& p):AudioProcessorEditor(p),
     status.setText("4x oversampled  /  velocity accent >= 102  /  legato MIDI slide  /  pitch bend +/-2 st  /  mod wheel vibrato",juce::dontSendNotification);
     preset.setSelectedId(processor.getCurrentProgram()+1,juce::dontSendNotification);
     displayedPreset=processor.getCurrentProgram();
+    updateOverlay=std::make_unique<gacid::UpdateResultOverlay>();
     createFeatureControls();setWantsKeyboardFocus(true);
     setResizable(true,true); setResizeLimits(960,705,5120,3760); getConstrainer()->setFixedAspectRatio(1280.0/940.0); setSize(1280,940);
     logoClockMs=juce::Time::getMillisecondCounter();
     startTimerHz(25);
 }
-GAcidBaseEditor::~GAcidBaseEditor() { stopTimer();juce::PopupMenu::dismissAllActiveMenus(); if(audition.getToggleState())processor.audition(false); setLookAndFeel(nullptr); }
+GAcidBaseEditor::~GAcidBaseEditor()
+{
+    // Join the update fetch before anything it touches goes away.
+    if(updateThread!=nullptr)updateThread->stopThread(4000);
+    stopTimer();juce::PopupMenu::dismissAllActiveMenus(); if(audition.getToggleState())processor.audition(false); setLookAndFeel(nullptr);
+}
 void GAcidBaseEditor::showFx(int page)
 {
     fxPage=page; for(int i=0;i<4;++i)for(auto* c:fxControls[static_cast<size_t>(i)])c->setVisible(i==page);
@@ -383,4 +389,82 @@ void GAcidBaseEditor::saveUiSnapshot(const juce::File& file)
         stream->setPosition(0);
         if(stream->truncate().wasOk())juce::PNGImageFormat().writeImageToStream(image,*stream);
     }
+}
+
+//==============================================================================
+//  Update check (TOOLS -> CHECK FOR UPDATES): reads the version feed the site
+//  publishes on a background thread and always reports back in the message
+//  thread - success, a newer release, or the reason nothing could be checked.
+//  This one anonymous GET of a static file is the only request the plugin ever
+//  makes.
+//==============================================================================
+namespace
+{
+    class UpdateCheckThread : public juce::Thread
+    {
+    public:
+        UpdateCheckThread(const juce::String& feedUrl,std::function<void(const gacid::UpdateOutcome&)> done)
+            : juce::Thread("gacidbase update check"),url(feedUrl),finished(std::move(done)) {}
+
+        void run() override
+        {
+            gacid::UpdateOutcome outcome;
+            int statusCode=0;
+            // A plain GET: this reads a static file, and GitHub Pages answers a
+            // bodyless POST with 405. inAddress keeps the empty parameter list
+            // in the URL rather than sending it as a body.
+            const auto stream=juce::URL(url).createInputStream(
+                juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+                    .withConnectionTimeoutMs(8000).withStatusCode(&statusCode));
+            if(stream!=nullptr&&statusCode>=200&&statusCode<300)
+                outcome=gacid::readFeed(juce::JSON::parse(stream->readEntireStreamAsString()),gacid::versionString());
+            finished(outcome);
+        }
+
+        juce::String url;
+        std::function<void(const gacid::UpdateOutcome&)> finished;
+    };
+}
+
+void GAcidBaseEditor::runUpdateCheck()
+{
+    if(updateThread!=nullptr&&updateThread->isThreadRunning())return;   // one shot at a time
+
+    // The callback only ever touches the editor through a SafePointer, so a
+    // check that outlives the window is harmless.
+    juce::Component::SafePointer<GAcidBaseEditor> safe(this);
+    updateThread=std::make_unique<UpdateCheckThread>(gacid::updateFeedUrl,[safe](const gacid::UpdateOutcome& outcome)
+    {
+        // Publish the whole result on the message thread in one go, so
+        // updateCheckDone() can never read half-written state.
+        juce::MessageManager::callAsync([safe,outcome]
+        {
+            if(safe==nullptr)return;
+            safe->updateResult=outcome;
+            safe->updateCheckDone();
+        });
+    });
+    updateThread->startThread();
+}
+
+void GAcidBaseEditor::updateCheckDone()
+{
+    // No thread teardown here: the worker may still be finishing its last
+    // lines; the next check (or the destructor) joins it safely.
+    //
+    // Every outcome opens this editor's own overlay - never a native box,
+    // never silence. A native box cannot host a link at all, which is the
+    // whole reason the download row is clickable here, and an unparented
+    // native box was free to land behind the DAW window, which reads as
+    // "nothing happens".
+    showUpdateResult(gacid::describe(updateResult,gacid::versionString()));
+}
+
+void GAcidBaseEditor::showUpdateResult(const gacid::UpdateMessage& message)
+{
+    if(updateOverlay==nullptr)return;
+    updateOverlay->configure(message.title,message.message,message.downloadUrl,message.notesUrl,message.downloadLabel);
+    updateOverlay->setBounds(0,0,1280,940);
+    updateOverlay->toFront(true);
+    updateOverlay->setVisible(true);
 }

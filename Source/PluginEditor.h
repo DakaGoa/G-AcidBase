@@ -1,6 +1,7 @@
 #pragma once
 #include "PluginProcessor.h"
 #include "Logo.h"
+#include "UpdateCheck.h"
 
 class AcidLookAndFeel : public juce::LookAndFeel_V4
 {
@@ -139,6 +140,12 @@ private:
     GAcidLogo::AnimationState logo;
     juce::int64 logoClockMs=0;
     inline static const juce::Rectangle<float> logoBounds { 24.f, 21.f, 48.f, 48.f };
+    // Update check: one anonymous GET of the site's version feed on a worker
+    // thread, answered in the message thread whatever the outcome.
+    juce::TextButton checkUpdates {"CHECK FOR UPDATES"};
+    std::unique_ptr<gacid::UpdateResultOverlay> updateOverlay;
+    std::unique_ptr<juce::Thread> updateThread;
+    gacid::UpdateOutcome updateResult;
 
     void timerCallback() override;
     AcidKnob* addKnob(const char*,juce::Rectangle<int>);
@@ -150,5 +157,8 @@ private:
     void createFeatureControls();
     void showControlMenu(const juce::String&,juce::Component*);
     void chooseMidiExport();
+    void runUpdateCheck();
+    void updateCheckDone();
+    void showUpdateResult(const gacid::UpdateMessage&);
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GAcidBaseEditor)
 };

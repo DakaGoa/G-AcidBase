@@ -23,7 +23,9 @@ void GAcidBaseEditor::createFeatureControls()
         auto& tab=featureTabs[static_cast<size_t>(i)];featurePanel.addAndMakeVisible(tab);tab.setButtonText(titles[i]);tab.setBounds(12+i*160,10,154,25);tab.onClick=[this,i]{showFeaturePage(i);};
     }
     featurePanel.addAndMakeVisible(featureClose);featureClose.setBounds(1140,10,78,25);featureClose.setComponentID("featureClose");featureClose.onClick=[this]{closePanels();};
-    featurePanel.addAndMakeVisible(featureTitle);featureTitle.setBounds(660,10,470,25);featureTitle.setColour(juce::Label::textColourId,cyan);
+    featurePanel.addAndMakeVisible(checkUpdates);checkUpdates.setBounds(660,10,176,25);checkUpdates.setComponentID("checkUpdates");checkUpdates.onClick=[this]{runUpdateCheck();};
+    featurePanel.addAndMakeVisible(featureTitle);featureTitle.setBounds(846,10,284,25);featureTitle.setColour(juce::Label::textColourId,cyan);
+    surface.addChildComponent(*updateOverlay);updateOverlay->setBounds(0,0,1280,940);
     const auto own=[this](std::unique_ptr<juce::Component> component,int page,juce::Rectangle<int> bounds)
     {
         auto* ptr=component.get();featurePanel.addAndMakeVisible(*ptr);ptr->setBounds(bounds);featureControls[static_cast<size_t>(page)].push_back(ptr);ownedFeatureControls.push_back(std::move(component));return ptr;
@@ -129,7 +131,7 @@ void GAcidBaseEditor::closePanels()
 }
 bool GAcidBaseEditor::keyPressed(const juce::KeyPress& key)
 {
-    if(key==juce::KeyPress::escapeKey){closePanels();return true;}
+    if(key==juce::KeyPress::escapeKey){if(updateOverlay!=nullptr&&updateOverlay->isVisible())updateOverlay->setVisible(false);closePanels();return true;}
     if(key.getModifiers().isCtrlDown())
     {
         const auto code=juce::CharacterFunctions::toLowerCase(static_cast<juce::juce_wchar>(key.getKeyCode()));

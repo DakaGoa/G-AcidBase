@@ -1,9 +1,11 @@
 from pathlib import Path
 import hashlib
 import json
+import re
 import shutil
 import struct
 import subprocess
+import urllib.request
 import zipfile
 
 root = Path(__file__).resolve().parents[1]
@@ -17,6 +19,15 @@ for size in (64, 128, 256, 512, 1024):
     assert (assets / f'G-AcidBase-Logo-{size}.png').is_file(), f'Run python scripts/make_logo.py: missing {size} px logo'
 header = (assets / 'G-AcidBase-Logo-512.png').read_bytes()
 assert header[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', header[16:24]) == (512, 512), 'Logo PNG must be a valid 512x512 image'
+# The update feed the plugin polls must name the version this package is: a
+# mismatch means the shipped plugin would offer an update to itself, or miss one
+# that exists. Checked here rather than in the plugin because the feed lives on
+# the site, and packaging is where the two halves meet.
+version = re.search(r'project\(GAcidBase VERSION ([0-9.]+)', (root / 'CMakeLists.txt').read_text()).group(1)
+feed_url = 'https://y4m4.github.io/GoaSynth/gacidbase/version.json'
+feed = json.loads(urllib.request.urlopen(feed_url, timeout=20).read())
+assert feed.get('latest') == version, f'{feed_url} says latest={feed.get("latest")}, this build is {version}'
+assert feed.get('url') == 'https://y4m4.github.io/GoaSynth/gacidbase/', 'the feed points somewhere other than the product page'
 plugin = build / 'GAcidBase_artefacts/Release/VST3/G-AcidBase.vst3'
 standalone = build / 'GAcidBase_artefacts/Release/Standalone/G-AcidBase.exe'
 assert plugin.is_dir(), 'Build the VST3 first'

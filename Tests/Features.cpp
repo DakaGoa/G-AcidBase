@@ -436,6 +436,68 @@ int main()
         require(acid->getLogoAnimation().resonance>.9f,
                 "the header logo follows the resonance parameter");
         modulation.setParameter("resonance",.68f);
+        // Update check: the version comparison and every word of the result
+        // dialog are decided as pure functions, so this needs no network and no
+        // window - the fetch thread only ever calls in to them.
+        require(gacid::versionString()=="1.1.0","the built version is the one CMake's project() names");
+        require(gacid::compareVersions("1.1.0","1.1.0")==0,"equal versions compare equal");
+        require(gacid::compareVersions("1.1.0","1.2.0")<0&&gacid::compareVersions("1.2.0","1.1.0")>0,"a minor release is offered");
+        require(gacid::compareVersions("1.1.0","1.1.1")<0,"a patch release is offered too");
+        require(gacid::compareVersions("1.1.0","v1.2")>0,"a malformed feed version cannot outrank the build");
+        require(gacid::installerUrl("1.2.0")=="https://github.com/Y4m4/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Windows-x64.zip",
+                "the download link points at the released package");
+        require(gacid::releaseNotesUrl("1.2.0")=="https://github.com/Y4m4/G-AcidBase/releases/tag/v1.2.0",
+                "the notes link points at the release");
+        const auto feed=[](const juce::String& json){return juce::JSON::parse(json);};
+        const auto full=gacid::readFeed(feed("{\"latest\":\"9.9.9\",\"released\":\"5 October 2026\",\"installer_size\":\"4.5 MB\",\"notes\":[\"first\",\"\",\"  \",\"second\",\"third\",\"fourth\",\"fifth\"]}"),gacid::versionString());
+        require(full.reachable&&full.newer,"a newer feed is reachable and offers an update");
+        require(full.notes.size()==4&&full.notes[0]=="first"&&full.notes[1]=="second"&&full.notes[3]=="fourth",
+                "the notes shown are the first four non-empty lines");
+        const auto message=gacid::describe(full,gacid::versionString());
+        require(message.title=="UPDATE AVAILABLE"&&message.message.contains("G-AcidBase 9.9.9 is available"),
+                "the update dialog names both versions");
+        require(message.message.contains("Released 5 October 2026.")&&message.message.contains("What's new:")
+                &&message.message.contains("4.5 MB")&&message.message.contains("first"),
+                "the update dialog carries the date, the notes and the download size");
+        require(message.downloadUrl==gacid::installerUrl("9.9.9")&&message.downloadLabel==gacid::installerAssetName()
+                &&message.notesUrl==gacid::releaseNotesUrl("9.9.9"),
+                "the update dialog links the installer and the release notes");
+        const auto bare=gacid::describe(gacid::readFeed(feed("{\"latest\":\"9.9.9\"}"),gacid::versionString()),gacid::versionString());
+        require(!bare.message.contains("Released ")&&!bare.message.contains("What's new:"),
+                "a feed with no date or notes leaves those lines out");
+        require(bare.message.contains("Download the new installer:"),"the download row is offered even without a size");
+        require(!gacid::readFeed(feed("not json"),gacid::versionString()).reachable,"an error page is not a feed");
+        const auto dead=gacid::describe(gacid::readFeed(feed("{\"latest\":\"\"}"),gacid::versionString()),gacid::versionString());
+        require(dead.title=="G-ACIDBASE"&&dead.message.contains("Could not reach the update feed")&&dead.downloadUrl==gacid::siteUrl
+                &&dead.notesUrl.isEmpty(),"an unreachable feed says so and points at the site");
+        const auto current=gacid::describe(gacid::readFeed(feed("{\"latest\":\"1.1.0\"}"),gacid::versionString()),gacid::versionString());
+        require(current.message.contains("You are running the latest version")&&current.downloadUrl.isEmpty(),
+                "an up-to-date build has nothing to download");
+        // The dialog itself: the rows sit inside the card, the download row
+        // names its file, and the card hides when there is nothing to offer.
+        gacid::UpdateResultOverlay overlay;
+        overlay.setBounds(0,0,1280,940);
+        overlay.configure("TITLE","body text","https://example.invalid/file.zip","https://example.invalid/notes","file.zip");
+        require(overlay.downloadLink.isVisible()&&overlay.notesLink.isVisible(),"both link rows show when both are offered");
+        require(overlay.cardBounds().contains(overlay.titleLabel.getBounds())&&overlay.cardBounds().contains(overlay.messageLabel.getBounds())
+                &&overlay.cardBounds().contains(overlay.downloadLink.getBounds())&&overlay.cardBounds().contains(overlay.notesLink.getBounds())
+                &&overlay.cardBounds().contains(overlay.okButton.getBounds())&&overlay.cardBounds().contains(overlay.closeButton.getBounds()),
+                "every row of the update dialog sits inside its card");
+        require(overlay.downloadLink.getButtonText()=="file.zip"&&overlay.downloadLink.getURL().toString(true)=="https://example.invalid/file.zip",
+                "the download row names the file and links the address");
+        overlay.configure("TITLE","body text",{},gacid::releaseNotesUrl("1.1.0"));
+        require(!overlay.downloadLink.isVisible()&&overlay.notesLink.isVisible(),"the download row hides when there is nothing to download");
+        overlay.configure("TITLE","body text",{},{});
+        require(!overlay.downloadLink.isVisible()&&!overlay.notesLink.isVisible(),"an unreachable-feed dialog offers no second door");
+        overlay.setVisible(true);overlay.okButton.triggerClick();pumpMessagesFor(40);   // Button::triggerClick posts a command message
+        require(!overlay.isVisible(),"the update dialog closes from its OK button");
+        overlay.setVisible(true);
+        overlay.mouseDown(juce::MouseEvent(*juce::Desktop::getInstance().getMouseSource(0),juce::Point<float>(4.f,4.f),juce::ModifierKeys(),0.f,0.f,0.f,0.f,0.f,&overlay,&overlay,juce::Time::getCurrentTime(),juce::Point<float>(4.f,4.f),juce::Time::getCurrentTime(),1,false));
+        require(!overlay.isVisible(),"clicking the backdrop dismisses the update dialog");
+        juce::Image dialogShot(juce::Image::ARGB,640,470,true);
+        { juce::Graphics g(dialogShot); overlay.setBounds(0,0,640,470); overlay.configure("G-ACIDBASE","body text",{},{}); overlay.paint(g); }
+        require(dialogShot.getPixelAt(2,2).getRed()<20&&dialogShot.getPixelAt(320,235).getRed()>15,
+                "the update dialog darkens the backdrop and draws its card");
         acid->setScaleFactor(1.5f);
         require(std::abs(editor->getTransform().getScaleFactor()-1.5f)<.001f,"host scale transform is preserved");
         for(const auto size:{juce::Point<int>(960,705),juce::Point<int>(1280,940),juce::Point<int>(1920,1410),juce::Point<int>(3840,2820),juce::Point<int>(5120,3760)})
@@ -585,7 +647,7 @@ int main()
         require(acid->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey))&&!acid->isPanelOpen()&&modulation.getMidiLearnParameter()<0,"Escape closes learn panel and cancels waiting learn");
         acid->beginMidiLearnFor("cutoff");clickUI("CLOSE");require(!acid->isPanelOpen(),"matrix Close restores FX controls");
         editor->removeFromDesktop();
-        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
+        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
         juce::File::getCurrentWorkingDirectory().getChildFile("artifacts/feature-verification.txt").replaceWithText(report);
         std::cout<<report;
 

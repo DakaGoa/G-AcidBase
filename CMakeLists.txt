@@ -16,7 +16,7 @@ juce_add_plugin(GAcidBase
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/G-AcidBase-Logo-512.png")
 juce_generate_juce_header(GAcidBase)
 target_sources(GAcidBase PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.cpp Source/AcidEngine.cpp Source/MusicalFeatures.cpp Source/FeatureEditor.cpp)
-target_compile_definitions(GAcidBase PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_PLUGINHOST_VST3=1)
+target_compile_definitions(GAcidBase PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0 JUCE_PLUGINHOST_VST3=1 GACIDBASE_VERSION="${PROJECT_VERSION}")
 target_link_libraries(GAcidBase PUBLIC juce::juce_audio_utils juce::juce_dsp PRIVATE juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
 juce_add_console_app(GAcidBaseTests PRODUCT_NAME "G-AcidBase Tests")
 juce_generate_juce_header(GAcidBaseTests)

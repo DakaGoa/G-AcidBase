@@ -25,6 +25,12 @@ After editing either the generator or the header constants, regenerate the asset
 
 The header mark is animated on top of that artwork. One cycle lasts exactly one host tempo beat, so the badge swells and brightens on the beat, an echo of the saw travels across it, and the **Resonance** control fattens the cyan filter slope and opens its end dot like a filter coming alive. Everything is vector, clipped to the badge and drawn from the same state the editor already repaints at 25 Hz, so it costs a few strokes on a 48 px square and no extra timer. `artifacts/G-AcidBase-Logo-Animation.png` shows one beat across the top and the same beat with the filter fully open underneath. The tests pin the animation when saving the header snapshot, check that motion never leaves the badge, and check that the resonance response touches only the filter slope.
 
+### Updates
+
+**TOOLS → CHECK FOR UPDATES** reads one anonymous `GET` of `https://y4m4.github.io/GoaSynth/gacidbase/version.json` — the only request the plugin ever makes — on a background thread, and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to the new package on GitHub and to that release's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
+
+The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists.
+
 ## Install / first sound
 
 1. Close your DAW.
