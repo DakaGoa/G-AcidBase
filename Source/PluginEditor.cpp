@@ -247,6 +247,7 @@ GAcidBaseEditor::GAcidBaseEditor(GAcidBaseProcessor& p):AudioProcessorEditor(p),
     preset.setSelectedId(processor.getCurrentProgram()+1,juce::dontSendNotification);
     displayedPreset=processor.getCurrentProgram();
     updateOverlay=std::make_unique<gacid::UpdateResultOverlay>();
+    aboutCard=std::make_unique<gacid::AboutCard>();
     createFeatureControls();setWantsKeyboardFocus(true);
     setResizable(true,true); setResizeLimits(960,705,5120,3760); getConstrainer()->setFixedAspectRatio(1280.0/940.0); setSize(1280,940);
     logoClockMs=juce::Time::getMillisecondCounter();
@@ -322,7 +323,7 @@ void GAcidBaseEditor::paint(juce::Graphics& g)
     GAcidLogo::paint(g,logoBounds,logo);
     text(g,"G-",84,23,58,48,39,white,true); text(g,"AcidBase",136,23,300,48,39,green,true);
     text(g,"GOA ACID SYNTHESIZER  /  303 REIMAGINED",27,78,400,18,11,muted,true);
-    text(g,"G-AUDIO  /  v1.1",1100,79,154,17,10,muted,true);
+    
     card(g,{24,116,1232,208},circuit?"CIRCUIT":"SYNTHESIS",circuit?"Inspired circuit trims - musical controls, not component values":"Bandlimited oscillator / nonlinear resonant ladder / accent + slide",green);
     card(g,{24,342,182,232},"PLAY MODE","MIDI / sequencer / arp",cyan);
     card(g,{220,342,294,232},"DISTORTION","Four nonlinear colors",purple);

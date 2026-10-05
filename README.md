@@ -31,6 +31,10 @@ The header mark is animated on top of that artwork. One cycle lasts exactly one 
 
 The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists.
 
+### About
+
+The header's version line (`G-AUDIO / <version>`) is a button: click it for the About card, which shows the running version and links to the [product page](https://y4m4.github.io/GoaSynth/gacidbase/), the [source repository](https://github.com/Y4m4/G-AcidBase) and the [current release](https://github.com/Y4m4/G-AcidBase/releases), along with how JUCE is licensed and the VST trademark note. The version on the card is read from the same constant the update check compares against, so it cannot describe a build other than the one running. Escape, the close button or clicking outside the card dismisses it.
+
 ## Install / first sound
 
 1. Close your DAW.

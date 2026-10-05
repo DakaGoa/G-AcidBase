@@ -567,6 +567,50 @@ int main()
             require(answeredAgain.load()&&!missing.reachable,
                     "a feed that cannot be fetched reports unreachable");
         }
+        // About card: the version it shows is the build's own, and each row goes to
+        // exactly one address - the product page, the source repository, the
+        // release list. Nothing here is read from the network.
+        require(juce::String(gacid::repositoryUrl)=="https://github.com/Y4m4/G-AcidBase"
+                &&juce::String(gacid::releasesUrl)=="https://github.com/Y4m4/G-AcidBase/releases",
+                "the About links name the project's repository and releases");
+        gacid::AboutCard about;
+        about.setBounds(0,0,1280,940);
+        require(about.versionLabel.getText()=="Version "+gacid::versionString(),
+                "the About card shows the running version");
+        require(about.pageLink.getURL().toString(true)==gacid::siteUrl
+                &&about.sourceLink.getURL().toString(true)==gacid::repositoryUrl
+                &&about.releaseLink.getURL().toString(true)==gacid::releasesUrl,
+                "each About row links its own address");
+        require(about.pageLink.getButtonText()=="Product page"&&about.sourceLink.getButtonText()=="Source repository"
+                &&about.releaseLink.getButtonText()=="Current release",
+                "the About rows are named by what they are, not by their URL");
+        require(about.cardBounds().contains(about.titleLabel.getBounds())&&about.cardBounds().contains(about.versionLabel.getBounds())
+                &&about.cardBounds().contains(about.summaryLabel.getBounds())&&about.cardBounds().contains(about.licenceLabel.getBounds())
+                &&about.cardBounds().contains(about.pageLink.getBounds())&&about.cardBounds().contains(about.sourceLink.getBounds())
+                &&about.cardBounds().contains(about.releaseLink.getBounds())&&about.cardBounds().contains(about.okButton.getBounds())
+                &&about.cardBounds().contains(about.closeButton.getBounds()),
+                "every row of the About card sits inside its card");
+        require(about.summaryLabel.getText().contains("50 factory presets")&&about.licenceLabel.getText().contains("JUCE"),
+                "the About card says what this is and how JUCE is licensed");
+        about.setVisible(true);about.okButton.triggerClick();pumpMessagesFor(40);
+        require(!about.isVisible(),"the About card closes from its OK button");
+        about.setVisible(true);
+        about.mouseDown(juce::MouseEvent(*juce::Desktop::getInstance().getMouseSource(0),juce::Point<float>(4.f,4.f),juce::ModifierKeys(),0.f,0.f,0.f,0.f,0.f,&about,&about,juce::Time::getCurrentTime(),juce::Point<float>(4.f,4.f),juce::Time::getCurrentTime(),1,false));
+        require(!about.isVisible(),"clicking the backdrop dismisses the About card");
+        // The header's version line opens it, and Escape closes it again.
+        juce::Button* aboutButton=nullptr;gacid::AboutCard* openCard=nullptr;
+        std::function<void(juce::Component&)> findAbout=[&](juce::Component& c)
+        {
+            if(auto* b=dynamic_cast<juce::Button*>(&c);b!=nullptr&&b->getComponentID()=="about")aboutButton=b;
+            if(auto* card=dynamic_cast<gacid::AboutCard*>(&c))openCard=card;
+            for(int i=0;i<c.getNumChildComponents();++i)findAbout(*c.getChildComponent(i));
+        };
+        findAbout(*editor);
+        require(aboutButton!=nullptr&&openCard!=nullptr,"the editor carries a version button and an About card");
+        aboutButton->triggerClick();pumpMessagesFor(60);
+        require(openCard->isVisible(),"the version button opens the About card");
+        require(acid->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey))&&!openCard->isVisible(),
+                "Escape closes the About card");
         acid->setScaleFactor(1.5f);
         require(std::abs(editor->getTransform().getScaleFactor()-1.5f)<.001f,"host scale transform is preserved");
         for(const auto size:{juce::Point<int>(960,705),juce::Point<int>(1280,940),juce::Point<int>(1920,1410),juce::Point<int>(3840,2820),juce::Point<int>(5120,3760)})
@@ -716,7 +760,7 @@ int main()
         require(acid->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey))&&!acid->isPanelOpen()&&modulation.getMidiLearnParameter()<0,"Escape closes learn panel and cancels waiting learn");
         acid->beginMidiLearnFor("cutoff");clickUI("CLOSE");require(!acid->isPanelOpen(),"matrix Close restores FX controls");
         editor->removeFromDesktop();
-        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
+        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, About card links and dismissal, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
         juce::File::getCurrentWorkingDirectory().getChildFile("artifacts/feature-verification.txt").replaceWithText(report);
         std::cout<<report;
 

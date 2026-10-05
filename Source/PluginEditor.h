@@ -2,6 +2,7 @@
 #include "PluginProcessor.h"
 #include "Logo.h"
 #include "UpdateCheck.h"
+#include "AboutCard.h"
 
 class AcidLookAndFeel : public juce::LookAndFeel_V4
 {
@@ -143,6 +144,8 @@ private:
     // Update check: one anonymous GET of the site's version feed on a worker
     // thread, answered in the message thread whatever the outcome.
     juce::TextButton checkUpdates {"CHECK FOR UPDATES"};
+    juce::TextButton about {"G-AUDIO  /  v1.1"};
+    std::unique_ptr<gacid::AboutCard> aboutCard;
     std::unique_ptr<gacid::UpdateResultOverlay> updateOverlay;
     std::unique_ptr<juce::Thread> updateThread;
     gacid::UpdateOutcome updateResult;
