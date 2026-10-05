@@ -569,9 +569,9 @@ int main()
         }
         // About card: the version it shows is the build's own, and each row goes to
         // exactly one address - the product page, the source repository, the
-        // release list. Nothing here is read from the network.
+        // current release. Nothing here is read from the network.
         require(juce::String(gacid::repositoryUrl)=="https://github.com/Y4m4/G-AcidBase"
-                &&juce::String(gacid::releasesUrl)=="https://github.com/Y4m4/G-AcidBase/releases",
+                &&juce::String(gacid::releasesUrl)=="https://github.com/Y4m4/G-AcidBase/releases/latest",
                 "the About links name the project's repository and releases");
         gacid::AboutCard about;
         about.setBounds(0,0,1280,940);
