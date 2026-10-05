@@ -161,13 +161,29 @@ GAcidBaseProcessor::GAcidBaseProcessor()
     }
     setCurrentProgram(0);
     undoStates.clear();
+    parameters.addParameterListener("run", this);
+    parameters.addParameterListener("mode", this);
     startTimerHz(30);
 }
-GAcidBaseProcessor::~GAcidBaseProcessor() { stopTimer(); }
+GAcidBaseProcessor::~GAcidBaseProcessor()
+{
+    parameters.removeParameterListener("run", this);
+    parameters.removeParameterListener("mode", this);
+    stopTimer();
+}
 float GAcidBaseProcessor::value(const char* id) const { auto it=values.find(id); return it!=values.end()?it->second->load():0; }
 void GAcidBaseProcessor::setParameter(const char* id,float v)
 {
     if(auto* p=parameters.getParameter(id)) { p->beginChangeGesture(); p->setValueNotifyingHost(p->convertTo0to1(v)); p->endChangeGesture(); }
+}
+// The RUN latch is the sequencer's play button and must never glow while the
+// sequence stands still: engaging it from plain MIDI mode selects SEQ, and
+// selecting MIDI mode releases it. Each rule only ever flips the other
+// parameter once, so these nested notifications cannot loop.
+void GAcidBaseProcessor::parameterChanged(const juce::String& id,float newValue)
+{
+    if(id=="run"&&newValue>.5f&&static_cast<int>(value("mode"))==0)setParameter("mode",1);
+    else if(id=="mode"&&static_cast<int>(newValue)==0&&value("run")>.5f)setParameter("run",0);
 }
 
 static const char* presetNames[] {
@@ -192,7 +208,10 @@ void GAcidBaseProcessor::setCurrentProgram(int i)
     for(auto& valid:morphValid)valid.store(false);
     // Each bank has a deliberately different musical role, with bounded variations inside the bank.
     const int bank=i/10, v=i%10;
-    for(const auto& s:parameterSpecs()) if(juce::String(s.id)!="run") setParameter(s.id,s.initial);
+    // Play mode and the RUN latch are transport, not sound: a preset keeps both,
+    // so a running sequence continues while sounds are browsed. Resetting mode
+    // here while the latch stayed lit is what made play appear dead.
+    for(const auto& s:parameterSpecs()) if(juce::String(s.id)!="run"&&juce::String(s.id)!="mode") setParameter(s.id,s.initial);
     setParameter("cutoff",bank==4?90.f+v*36.f:180.f+v*84.f+bank*100.f);
     setParameter("resonance",bank==4?.3f+v*.055f:.62f+v*.034f);
     setParameter("envMod",bank==4?.3f+v*.035f:.5f+v*.038f);

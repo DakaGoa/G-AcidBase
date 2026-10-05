@@ -14,7 +14,8 @@ struct ParameterSpec
 };
 const std::vector<ParameterSpec>& parameterSpecs();
 
-class GAcidBaseProcessor : public juce::AudioProcessor, private juce::Timer
+class GAcidBaseProcessor : public juce::AudioProcessor, private juce::Timer,
+    private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     GAcidBaseProcessor();
@@ -89,6 +90,7 @@ private:
     juce::ValueTree stateWithPattern();
     bool restoreState(const juce::ValueTree&);
     void handleMidi(const juce::MidiMessage&, int mode, AcidSettings&);
+    void parameterChanged(const juce::String&, float) override;
     void applyLearnedMidi(const juce::MidiMessage&);
     void timerCallback() override;
     void updateMidiRoute(int controller, int channel, int slot);

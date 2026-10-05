@@ -248,6 +248,41 @@ int main()
         transport.ppq=1;host.processBlock(hostAudio,hostMidi);require(host.activeStep==4,"backward host seek resynchronizes sequence");
         transport.ppq=-.25;host.processBlock(hostAudio,hostMidi);require(host.activeStep==15,"negative host PPQ remains valid");
         host.setPlayHead(nullptr);
+        // The RUN latch is the sequencer's play button. The shipped bug: it lit
+        // up while nothing played - RUN in plain MIDI mode did nothing at all,
+        // and choosing a preset reset Play mode to MIDI while the latch stayed
+        // lit, stalling a sequence that had been running.
+        {
+            auto owner=std::make_unique<GAcidBaseProcessor>();auto& p=*owner;
+            p.setCurrentProgram(0);p.setParameter("bypass",1);
+            require(static_cast<int>(p.value("mode"))==0,"factory presets load in plain MIDI mode");
+            p.setParameter("mode",2);p.setParameter("run",1);
+            require(static_cast<int>(p.value("mode"))==2,"RUN engaged in ARP mode stays in ARP mode");
+            p.setParameter("mode",0);
+            require(p.value("run")<.5f,"choosing MIDI play mode releases the RUN latch");
+            p.setParameter("run",1);
+            require(static_cast<int>(p.value("mode"))==1,"engaging RUN from MIDI mode selects the sequencer");
+            p.prepareToPlay(48000,64);
+            juce::AudioBuffer<float> audio(2,4096);juce::MidiBuffer midi;
+            int changes=0,previous=p.activeStep.load();float heard=0;
+            for(int block=0;block<12;++block)
+            {
+                p.processBlock(audio,midi);
+                const int now=p.activeStep.load();if(now!=previous){++changes;previous=now;}
+                heard=juce::jmax(heard,audio.getMagnitude(0,0,4096));
+            }
+            require(changes>=3&&heard>.001f,"RUN pressed in MIDI mode advances steps and makes sound");
+            p.setCurrentProgram(23);
+            require(p.value("run")>.5f&&static_cast<int>(p.value("mode"))==1,"choosing a preset keeps the play mode and the RUN latch");
+            changes=0;previous=p.activeStep.load();heard=0;
+            for(int block=0;block<12;++block)
+            {
+                p.processBlock(audio,midi);
+                const int now=p.activeStep.load();if(now!=previous){++changes;previous=now;}
+                heard=juce::jmax(heard,audio.getMagnitude(0,0,4096));
+            }
+            require(changes>=3&&heard>.001f,"the sequence keeps playing across preset changes");
+        }
         // Dense host automation remains finite over representative sample rates and odd blocks.
         for(double sr:{44100.,48000.,96000.})
         {
@@ -444,9 +479,9 @@ int main()
         require(gacid::compareVersions("1.1.0","1.2.0")<0&&gacid::compareVersions("1.2.0","1.1.0")>0,"a minor release is offered");
         require(gacid::compareVersions("1.1.0","1.1.1")<0,"a patch release is offered too");
         require(gacid::compareVersions("1.1.0","v1.2")>0,"a malformed feed version cannot outrank the build");
-        require(gacid::installerUrl("1.2.0")=="https://github.com/Y4m4/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Windows-x64.zip",
+        require(gacid::installerUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Windows-x64.zip",
                 "the download link points at the released package");
-        require(gacid::releaseNotesUrl("1.2.0")=="https://github.com/Y4m4/G-AcidBase/releases/tag/v1.2.0",
+        require(gacid::releaseNotesUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/tag/v1.2.0",
                 "the notes link points at the release");
         const auto feed=[](const juce::String& json){return juce::JSON::parse(json);};
         const auto full=gacid::readFeed(feed("{\"latest\":\"9.9.9\",\"released\":\"5 October 2026\",\"installer_size\":\"4.5 MB\",\"notes\":[\"first\",\"\",\"  \",\"second\",\"third\",\"fourth\",\"fifth\"]}"),gacid::versionString());
@@ -570,8 +605,8 @@ int main()
         // About card: the version it shows is the build's own, and each row goes to
         // exactly one address - the product page, the source repository, the
         // current release. Nothing here is read from the network.
-        require(juce::String(gacid::repositoryUrl)=="https://github.com/Y4m4/G-AcidBase"
-                &&juce::String(gacid::releasesUrl)=="https://github.com/Y4m4/G-AcidBase/releases/latest",
+        require(juce::String(gacid::repositoryUrl)=="https://github.com/DakaGoa/G-AcidBase"
+                &&juce::String(gacid::releasesUrl)=="https://github.com/DakaGoa/G-AcidBase/releases/latest",
                 "the About links name the project's repository and releases");
         gacid::AboutCard about;
         about.setBounds(0,0,1280,940);
@@ -760,7 +795,7 @@ int main()
         require(acid->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey))&&!acid->isPanelOpen()&&modulation.getMidiLearnParameter()<0,"Escape closes learn panel and cancels waiting learn");
         acid->beginMidiLearnFor("cutoff");clickUI("CLOSE");require(!acid->isPanelOpen(),"matrix Close restores FX controls");
         editor->removeFromDesktop();
-        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, About card links and dismissal, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
+        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, sequencer RUN transport (play engages SEQ, presets keep playback, MIDI releases the latch), CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, About card links and dismissal, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
         juce::File::getCurrentWorkingDirectory().getChildFile("artifacts/feature-verification.txt").replaceWithText(report);
         std::cout<<report;
 

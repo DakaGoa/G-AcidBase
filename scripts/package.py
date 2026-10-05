@@ -24,10 +24,10 @@ assert header[:8] == b'\x89PNG\r\n\x1a\n' and struct.unpack('>II', header[16:24]
 # that exists. Checked here rather than in the plugin because the feed lives on
 # the site, and packaging is where the two halves meet.
 version = re.search(r'project\(GAcidBase VERSION ([0-9.]+)', (root / 'CMakeLists.txt').read_text()).group(1)
-feed_url = 'https://y4m4.github.io/GoaSynth/gacidbase/version.json'
+feed_url = 'https://dakagoa.github.io/GoaSynth/gacidbase/version.json'
 feed = json.loads(urllib.request.urlopen(feed_url, timeout=20).read())
 assert feed.get('latest') == version, f'{feed_url} says latest={feed.get("latest")}, this build is {version}'
-assert feed.get('url') == 'https://y4m4.github.io/GoaSynth/gacidbase/', 'the feed points somewhere other than the product page'
+assert feed.get('url') == 'https://dakagoa.github.io/GoaSynth/gacidbase/', 'the feed points somewhere other than the product page'
 plugin = build / 'GAcidBase_artefacts/Release/VST3/G-AcidBase.vst3'
 standalone = build / 'GAcidBase_artefacts/Release/Standalone/G-AcidBase.exe'
 assert plugin.is_dir(), 'Build the VST3 first'

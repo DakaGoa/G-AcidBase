@@ -47,7 +47,9 @@ int main(int argc,char** argv)
     juce::String csv="preset,peak,rms,dc,cpu_ms\n";
     for(int preset=0;preset<50;++preset)
     {
-        processor.setCurrentProgram(preset); processor.setParameter("run",0);
+        // Factory .gacid files capture the transport stopped in MIDI mode,
+        // whatever the previous test render left running.
+        processor.setCurrentProgram(preset); processor.setParameter("mode",0); processor.setParameter("run",0);
         auto name=processor.getProgramName(preset); names.insert(name);
         juce::MemoryBlock data; processor.getStateInformation(data); states.insert(data.toBase64Encoding());
         const auto filename=name.replace(" / "," - ").replaceCharacter('/','-')+".gacid";
@@ -106,7 +108,7 @@ int main(int argc,char** argv)
     midi.addEvent(juce::MidiMessage::noteOn(1,36,.7f),0); midi.addEvent(juce::MidiMessage::noteOn(1,43,1.f),30);
     Stats arp; for(int i=0;i<200;++i){processor.processBlock(audio,midi);measure(audio,arp);} check(arp.finite&&arp.peak>.01f&&processor.activeStep>=0,"arpeggiator runs from held MIDI notes");
     midi.addEvent(juce::MidiMessage::allNotesOff(1),0); processor.processBlock(audio,midi); check(processor.activeStep==-1,"arpeggiator stops on panic"); processor.releaseResources();
-    processor.setCurrentProgram(0); processor.setParameter("run",0);
+    processor.setCurrentProgram(0); processor.setParameter("mode",0); processor.setParameter("run",0);
     {
         std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
         auto* acid=dynamic_cast<GAcidBaseEditor*>(editor.get()); check(acid!=nullptr,"native editor creates");

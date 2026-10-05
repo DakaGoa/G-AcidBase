@@ -30,10 +30,10 @@ inline juce::String versionString() { return juce::String (GACIDBASE_VERSION); }
 // The product site, the feed it publishes, and where a release hangs its
 // install. Same origin for the first two, one path apart; the install lives on
 // GitHub because that is where the release assets are attached.
-inline constexpr const char* siteUrl = "https://y4m4.github.io/GoaSynth/gacidbase/";
-inline constexpr const char* updateFeedUrl = "https://y4m4.github.io/GoaSynth/gacidbase/version.json";
-inline constexpr const char* releaseDownloadBase = "https://github.com/Y4m4/G-AcidBase/releases/download";
-inline constexpr const char* releaseNotesBase = "https://github.com/Y4m4/G-AcidBase/releases/tag";
+inline constexpr const char* siteUrl = "https://dakagoa.github.io/GoaSynth/gacidbase/";
+inline constexpr const char* updateFeedUrl = "https://dakagoa.github.io/GoaSynth/gacidbase/version.json";
+inline constexpr const char* releaseDownloadBase = "https://github.com/DakaGoa/G-AcidBase/releases/download";
+inline constexpr const char* releaseNotesBase = "https://github.com/DakaGoa/G-AcidBase/releases/tag";
 
 // The asset every release attaches: the packaged Windows build, not an
 // installer that needs one. Named here rather than in the feed so a mistyped

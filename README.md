@@ -27,13 +27,13 @@ The header mark is animated on top of that artwork. One cycle lasts exactly one 
 
 ### Updates
 
-**TOOLS → CHECK FOR UPDATES** reads one anonymous `GET` of `https://y4m4.github.io/GoaSynth/gacidbase/version.json` — the only request the plugin ever makes — on a background thread, and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to the new package on GitHub and to that release's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
+**TOOLS → CHECK FOR UPDATES** reads one anonymous `GET` of `https://dakagoa.github.io/GoaSynth/gacidbase/version.json` — the only request the plugin ever makes — on a background thread, and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to the new package on GitHub and to that release's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
 
 The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists.
 
 ### About
 
-The header's version line (`G-AUDIO / <version>`) is a button: click it for the About card, which shows the running version and links to the [product page](https://y4m4.github.io/GoaSynth/gacidbase/), the [source repository](https://github.com/Y4m4/G-AcidBase) and the [current release](https://github.com/Y4m4/G-AcidBase/releases/latest), along with how JUCE is licensed and the VST trademark note. The version on the card is read from the same constant the update check compares against, so it cannot describe a build other than the one running. Escape, the close button or clicking outside the card dismisses it.
+The header's version line (`G-AUDIO / <version>`) is a button: click it for the About card, which shows the running version and links to the [product page](https://dakagoa.github.io/GoaSynth/gacidbase/), the [source repository](https://github.com/DakaGoa/G-AcidBase) and the [current release](https://github.com/DakaGoa/G-AcidBase/releases/latest), along with how JUCE is licensed and the VST trademark note. The version on the card is read from the same constant the update check compares against, so it cannot describe a build other than the one running. Escape, the close button or clicking outside the card dismisses it.
 
 ## Install / first sound
 
@@ -41,7 +41,7 @@ The header's version line (`G-AUDIO / <version>`) is a button: click it for the 
 2. Copy `dist/G-AcidBase.vst3` to `%LOCALAPPDATA%\Programs\Common\VST3\` if your DAW supports this user location, or add `dist` to its custom VST3 scan paths. The machine-wide standard is `C:\Program Files\Common Files\VST3\` (Windows may ask for administrator permission when **you** copy there).
 3. Rescan plugins, then load **G-AcidBase as an instrument** on a MIDI/instrument track, not as an audio effect.
 4. Start with low monitor/headphone volume. The default is MIDI mode. Send C2 (MIDI note 36), use the on-screen keyboard, or toggle **AUDITION**.
-5. For the factory acid pattern, choose **SEQ**, then **RUN**. Select any of the 50 presets. RUN is a manual latch; switch it off to stop. Choosing a preset returns to MIDI mode and does not change the RUN latch.
+5. For the factory acid pattern, press **RUN** - it is the sequencer's play button and selects **SEQ** play mode whenever the plugin is sitting in MIDI mode. Select any of the 50 presets; browsing presets keeps the sequence running, each with its own factory pattern and sound. RUN is a manual latch; switch it off to stop. Choosing **MIDI** play mode stops the sequence and releases the latch.
 6. DAW tempo takes precedence over the internal tempo when available. When the host is playing, sequence phase follows host PPQ; when stopped or standalone, the internal clock runs. This is explicitly triggered by RUN or held MIDI, not automatically by the host Play button.
 
 The standalone app has an **Options** button for selecting audio outputs and MIDI input devices. It does not need a DAW. If Windows warns about an unsigned executable, this local build is not code-signed; do not disable system-wide security settings.
@@ -73,7 +73,7 @@ This is an original musical interpretation, **not** a circuit-identical TB-303 m
 | Wave, tuning, cutoff, resonance, envmod, decay, accent | SYNTHESIS main row. |
 | Slide time, sweep, env attack, acc decay, acc vol, vib speed/depth | SYNTHESIS main row (slide also available in PLAY MODE). |
 | TM3, C21/22, ACCENV, ACCAMP, C13, TM5, SQR PW, BA662 clicks/noise | CIRCUIT TRIMS reveals nine host-automatable mappings: tuning trim, envelope shape, accent amounts, saturation bias, key tracking, pulse width, click/noise levels. |
-| EXT / SEQ / ARP | MIDI / SEQ / ARP play mode. MIDI is the external note-input mode; no external audio-to-CV input. |
+| EXT / SEQ / ARP | MIDI / SEQ / ARP play mode. MIDI is the external note-input mode; no external audio-to-CV input. RUN engages SEQ from MIDI mode; choosing MIDI releases the RUN latch. |
 | Distortion active / model / dynamics / order / drive / color | DISTORTION panel. Pre/post means before/after the resonant filter. |
 | Reverb / EQ / delay / chorus / limiter / bypass FX | FX tabs each have ENABLE; limiter and bypass are in OUTPUT. Switching FX pages does not change their enable state. |
 | Predelay / early-late / feedback / FX | Reverb page: predelay, diffusion/damping balance, decay (room size), mix. This is not literal early-reflection impulse modeling. |

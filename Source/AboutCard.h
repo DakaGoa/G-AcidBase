@@ -14,11 +14,11 @@
 // current release, and tests assert each row points at exactly one of them.
 namespace gacid
 {
-inline constexpr const char* repositoryUrl = "https://github.com/Y4m4/G-AcidBase";
+inline constexpr const char* repositoryUrl = "https://github.com/DakaGoa/G-AcidBase";
 // /releases/latest, not /releases: the row is named "Current release", and that
 // is the address that resolves to exactly the newest one rather than the list
 // somebody then has to pick through.
-inline constexpr const char* releasesUrl = "https://github.com/Y4m4/G-AcidBase/releases/latest";
+inline constexpr const char* releasesUrl = "https://github.com/DakaGoa/G-AcidBase/releases/latest";
 
 struct AboutCard : juce::Component
 {
