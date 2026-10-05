@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" width="1024" height="1024" role="img" aria-label="G-AcidBase logo">
+  <title>G-AcidBase</title>
+  <desc>Acid-green saw wave over a cyan resonant filter slope with a violet control knob, on a graphite badge.</desc>
+  <rect x="0.0200" y="0.0200" width="0.9600" height="0.9600" rx="0.2200" fill="#10161f"/>
+  <rect x="0.0200" y="0.0200" width="0.9600" height="0.9600" rx="0.2200" fill="none" stroke="#33425a" stroke-width="0.0350"/>
+  <polyline points="0.1300,0.4400 0.3567,0.1900 0.3567,0.4400 0.6033,0.1900 0.6033,0.4400 0.8500,0.1900 0.8500,0.4400" fill="none" stroke="#b8ff38" stroke-width="0.0500" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="0.1300,0.5400 0.8700,0.7200" fill="none" stroke="#42e8da" stroke-width="0.0380" stroke-linecap="round"/>
+  <circle cx="0.8700" cy="0.7200" r="0.0550" fill="#42e8da"/>
+  <circle cx="0.2200" cy="0.7900" r="0.0880" fill="none" stroke="#b290ff" stroke-width="0.0360"/>
+  <polyline points="0.2200,0.7900 0.2820,0.7280" fill="none" stroke="#b290ff" stroke-width="0.0420" stroke-linecap="round"/>
+</svg>

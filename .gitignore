@@ -1,0 +1,6 @@
+/build/
+/artifacts/
+/dist/
+/.freebuff/
+*.user
+__pycache__/
