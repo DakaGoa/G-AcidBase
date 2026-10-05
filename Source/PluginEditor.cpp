@@ -398,34 +398,6 @@ void GAcidBaseEditor::saveUiSnapshot(const juce::File& file)
 //  This one anonymous GET of a static file is the only request the plugin ever
 //  makes.
 //==============================================================================
-namespace
-{
-    class UpdateCheckThread : public juce::Thread
-    {
-    public:
-        UpdateCheckThread(const juce::String& feedUrl,std::function<void(const gacid::UpdateOutcome&)> done)
-            : juce::Thread("gacidbase update check"),url(feedUrl),finished(std::move(done)) {}
-
-        void run() override
-        {
-            gacid::UpdateOutcome outcome;
-            int statusCode=0;
-            // A plain GET: this reads a static file, and GitHub Pages answers a
-            // bodyless POST with 405. inAddress keeps the empty parameter list
-            // in the URL rather than sending it as a body.
-            const auto stream=juce::URL(url).createInputStream(
-                juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
-                    .withConnectionTimeoutMs(8000).withStatusCode(&statusCode));
-            if(stream!=nullptr&&statusCode>=200&&statusCode<300)
-                outcome=gacid::readFeed(juce::JSON::parse(stream->readEntireStreamAsString()),gacid::versionString());
-            finished(outcome);
-        }
-
-        juce::String url;
-        std::function<void(const gacid::UpdateOutcome&)> finished;
-    };
-}
-
 void GAcidBaseEditor::runUpdateCheck()
 {
     if(updateThread!=nullptr&&updateThread->isThreadRunning())return;   // one shot at a time
@@ -433,7 +405,7 @@ void GAcidBaseEditor::runUpdateCheck()
     // The callback only ever touches the editor through a SafePointer, so a
     // check that outlives the window is harmless.
     juce::Component::SafePointer<GAcidBaseEditor> safe(this);
-    updateThread=std::make_unique<UpdateCheckThread>(gacid::updateFeedUrl,[safe](const gacid::UpdateOutcome& outcome)
+    updateThread=std::make_unique<gacid::UpdateCheckThread>(gacid::updateFeedUrl,[safe](const gacid::UpdateOutcome& outcome)
     {
         // Publish the whole result on the message thread in one go, so
         // updateCheckDone() can never read half-written state.

@@ -498,6 +498,75 @@ int main()
         { juce::Graphics g(dialogShot); overlay.setBounds(0,0,640,470); overlay.configure("G-ACIDBASE","body text",{},{}); overlay.paint(g); }
         require(dialogShot.getPixelAt(2,2).getRed()<20&&dialogShot.getPixelAt(320,235).getRed()>15,
                 "the update dialog darkens the backdrop and draws its card");
+        // The address the plugin polls is the one the site publishes.
+        require(juce::String(gacid::updateFeedUrl)==juce::String(gacid::siteUrl)+"version.json",
+                "the update feed sits beside the product page");
+        // The fetch itself, end to end: a local server answers the very GET the
+        // button makes, and the outcome arrives through the same callback the
+        // editor receives. No network and no DAW - just the whole path from
+        // "user clicked" to "outcome parsed".
+        {
+            struct FeedServer : juce::Thread
+            {
+                FeedServer(const juce::String& body,int portNumber)
+                    : juce::Thread("feed server"),payload(body),port(portNumber) {}
+                void run() override
+                {
+                    juce::StreamingSocket listener;
+                    if(!listener.createListener(port,"127.0.0.1")){failed=true;return;}
+                    std::unique_ptr<juce::StreamingSocket> client(listener.waitForNextConnection());
+                    if(client==nullptr){failed=true;listener.close();return;}
+                    char request[2048];
+                    // StreamingSocket::read's third argument is shouldBlock, not a timeout:
+                    // wait for the request to land, then take whatever is there.
+                    client->waitUntilReady(true,5000);
+                    client->read(request,static_cast<int>(sizeof(request)),false);
+                    const juce::String header="HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                                             +juce::String(payload.getNumBytesAsUTF8())+"\r\nConnection: close\r\n\r\n";
+                    client->write(header.toRawUTF8(),static_cast<int>(header.getNumBytesAsUTF8()));
+                    client->write(payload.toRawUTF8(),static_cast<int>(payload.getNumBytesAsUTF8()));
+                    client->close();listener.close();
+                }
+                juce::String payload;int port;bool failed=false;
+            };
+            constexpr int port=48917;
+            FeedServer server("{\"latest\":\"9.9.9\",\"released\":\"tomorrow\",\"installer_size\":\"1 MB\",\"notes\":[\"one\"]}",port);
+            server.startThread();
+            std::atomic<bool> answered { false };
+            gacid::UpdateOutcome fetched;
+            gacid::UpdateCheckThread check("http://127.0.0.1:"+juce::String(port)+"/version.json",
+                [&](const gacid::UpdateOutcome& outcome)
+                {
+                    fetched=outcome;   // written before the flag, read after it
+                    answered.store(true);
+                });
+            check.startThread();
+            const auto deadline=GetTickCount64()+8000;
+            while(!answered.load()&&GetTickCount64()<deadline)pumpMessagesFor(50);
+            check.stopThread(4000);server.stopThread(4000);
+            require(!server.failed,"the local feed server accepts the plugin's request");
+            require(answered.load(),"the update check always reports back");
+            require(fetched.reachable&&fetched.newer&&fetched.latestVersion=="9.9.9"
+                    &&fetched.released=="tomorrow"&&fetched.packageSize=="1 MB"&&fetched.notes.size()==1&&fetched.notes[0]=="one",
+                    "the real fetch path delivers the feed to the caller"
+                    " (reachable="+juce::String(fetched.reachable?1:0)+" newer="+juce::String(fetched.newer?1:0)
+                    +" version="+fetched.latestVersion+" released="+fetched.released+" size="+fetched.packageSize
+                    +" notes="+juce::String(fetched.notes.size())+" serverFailed="+juce::String(server.failed?1:0)+")");
+            // A server that answers 404 is "cannot check", never "up to date".
+            std::atomic<bool> answeredAgain { false };
+            gacid::UpdateOutcome missing;
+            gacid::UpdateCheckThread denied("http://127.0.0.1:1/nowhere",
+                [&](const gacid::UpdateOutcome& outcome)
+                {
+                    missing=outcome;answeredAgain.store(true);
+                });
+            denied.startThread();
+            const auto retry=GetTickCount64()+8000;
+            while(!answeredAgain.load()&&GetTickCount64()<retry)pumpMessagesFor(50);
+            denied.stopThread(4000);
+            require(answeredAgain.load()&&!missing.reachable,
+                    "a feed that cannot be fetched reports unreachable");
+        }
         acid->setScaleFactor(1.5f);
         require(std::abs(editor->getTransform().getScaleFactor()-1.5f)<.001f,"host scale transform is preserved");
         for(const auto size:{juce::Point<int>(960,705),juce::Point<int>(1280,940),juce::Point<int>(1920,1410),juce::Point<int>(3840,2820),juce::Point<int>(5120,3760)})

@@ -181,6 +181,36 @@ inline UpdateMessage describe (const UpdateOutcome& outcome, const juce::String&
     return result;
 }
 
+// The fetch. One GET of the feed, on its own thread, that hands the outcome
+// back exactly once - success or failure - through the callback. Every path
+// through run() ends in that callback: a check that fails silently is
+// indistinguishable from a dead button. The URL is a parameter rather than a
+// constant so tests can point the real fetch at a local server.
+class UpdateCheckThread : public juce::Thread
+{
+public:
+    UpdateCheckThread (const juce::String& feedUrl, std::function<void (const UpdateOutcome&)> done)
+        : juce::Thread ("gacidbase update check"), url (feedUrl), finished (std::move (done)) {}
+
+    void run() override
+    {
+        UpdateOutcome outcome;
+        int statusCode = 0;
+        // A plain GET: this reads a static file, and GitHub Pages answers a
+        // bodyless POST with 405. inAddress keeps the empty parameter list in
+        // the URL rather than sending it as a body.
+        const auto stream = juce::URL (url).createInputStream (
+            juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
+                .withConnectionTimeoutMs (8000).withStatusCode (&statusCode));
+        if (stream != nullptr && statusCode >= 200 && statusCode < 300)
+            outcome = readFeed (juce::JSON::parse (stream->readEntireStreamAsString()), versionString());
+        finished (outcome);
+    }
+
+    juce::String url;
+    std::function<void (const UpdateOutcome&)> finished;
+};
+
 // The result card. A child of the editor's surface rather than a native box
 // because a native box cannot host a link at all, and the whole point of the
 // two download outcomes is that the address is clickable - plus a native box
