@@ -146,7 +146,7 @@ def release_assets(version: str) -> dict[str, Path]:
     wanted = {
         ZIP_NAME: DIST / ZIP_NAME,
         setup_name: DIST / setup_name,
-        setup_name + ".sha256": DIST / setup_name + ".sha256",
+        setup_name + ".sha256": DIST / (setup_name + ".sha256"),
         "SHA256SUMS.txt": DIST / "SHA256SUMS.txt",
     }
     for name, path in wanted.items():
