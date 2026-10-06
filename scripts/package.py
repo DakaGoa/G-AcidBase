@@ -32,6 +32,17 @@ plugin = build / 'GAcidBase_artefacts/Release/VST3/G-AcidBase.vst3'
 standalone = build / 'GAcidBase_artefacts/Release/Standalone/G-AcidBase.exe'
 assert plugin.is_dir(), 'Build the VST3 first'
 assert standalone.is_file(), 'Build the standalone first'
+binary = plugin / 'Contents/x86_64-win/G-AcidBase.vst3'
+assert binary.is_file(), 'The VST3 bundle has no x86_64-win binary; build the VST3 first'
+# A passing test run says nothing about a binary that predates the code it claims
+# to contain, so every file the plugin is built from is compared against both
+# shipped executables and a stale build is refused before anything is packaged.
+sources = sorted((root / 'Source').rglob('*.cpp')) + sorted((root / 'Source').rglob('*.h')) + [root / 'CMakeLists.txt']
+newest_source = max(sources, key=lambda path: path.stat().st_mtime)
+for output in (binary, standalone):
+    assert output.stat().st_mtime >= newest_source.stat().st_mtime, (
+        f'{output.relative_to(root).as_posix()} was built before {newest_source.relative_to(root).as_posix()} '
+        'was last changed; rebuild Release (cmake --build build --config Release) before packaging')
 # Never package merely because a stale report says a previous build passed.
 subprocess.run(['ctest', '--test-dir', str(build), '-C', 'Release', '--output-on-failure'], cwd=root, check=True)
 for report in ('verification.txt', 'feature-verification.txt'):

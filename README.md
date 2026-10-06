@@ -31,7 +31,7 @@ On its **first editor opening**, G-AcidBase automatically reads one anonymous `G
 
 **TOOLS → CHECK FOR UPDATES** remains an explicit fresh check and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to the new package on GitHub and to that release's notes on the product page (`gacidbase/#vX.Y.Z`). **TOOLS → CHANGE LOG** opens the full site history (`gacidbase/#changelog`); the up-to-date dialog links the running version's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
 
-The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists.
+The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists. It also refuses a build older than any file the plugin is compiled from (`Source/*.cpp`, `Source/*.h`, `CMakeLists.txt`), so a release cannot ship stale code behind a passing test report.
 
 ### About
 
