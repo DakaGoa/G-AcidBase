@@ -474,13 +474,15 @@ int main()
         // Update check: the version comparison and every word of the result
         // dialog are decided as pure functions, so this needs no network and no
         // window - the fetch thread only ever calls in to them.
-        require(gacid::versionString()=="1.1.0","the built version is the one CMake's project() names");
+        require(gacid::versionString()=="1.1.1","the built version is the one CMake's project() names");
         require(gacid::compareVersions("1.1.0","1.1.0")==0,"equal versions compare equal");
         require(gacid::compareVersions("1.1.0","1.2.0")<0&&gacid::compareVersions("1.2.0","1.1.0")>0,"a minor release is offered");
         require(gacid::compareVersions("1.1.0","1.1.1")<0,"a patch release is offered too");
         require(gacid::compareVersions("1.1.0","v1.2")>0,"a malformed feed version cannot outrank the build");
-        require(gacid::installerUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Windows-x64.zip",
-                "the download link points at the released package");
+        require(gacid::installerUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Setup-1.2.0.exe",
+                "the download link points at that release's installer, named for its version");
+        require(gacid::installerAssetName("1.2.0")=="G-AcidBase-Setup-1.2.0.exe",
+                "the installer asset name carries the version it installs");
         require(gacid::releaseNotesUrl("1.2.0")=="https://dakagoa.github.io/GoaSynth/gacidbase/#v1.2.0",
                 "the notes link deep-links to the site's matching release heading");
         require(gacid::changeLogUrl=="https://dakagoa.github.io/GoaSynth/gacidbase/#changelog",
@@ -496,7 +498,7 @@ int main()
         require(message.message.contains("Released 5 October 2026.")&&message.message.contains("What's new:")
                 &&message.message.contains("4.5 MB")&&message.message.contains("first"),
                 "the update dialog carries the date, the notes and the download size");
-        require(message.downloadUrl==gacid::installerUrl("9.9.9")&&message.downloadLabel==gacid::installerAssetName()
+        require(message.downloadUrl==gacid::installerUrl("9.9.9")&&message.downloadLabel==gacid::installerAssetName("9.9.9")
                 &&message.notesUrl==gacid::releaseNotesUrl("9.9.9"),
                 "the update dialog links the installer and the release notes");
         const auto bare=gacid::describe(gacid::readFeed(feed("{\"latest\":\"9.9.9\"}"),gacid::versionString()),gacid::versionString());

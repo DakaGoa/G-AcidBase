@@ -23,7 +23,7 @@ namespace gacid
 // without CMake fall back to the same string project() currently names - keep
 // the two in sync when bumping, and bump docs/gacidbase/version.json with them.
 #ifndef GACIDBASE_VERSION
- #define GACIDBASE_VERSION "1.1.0"
+ #define GACIDBASE_VERSION "1.1.1"
 #endif
 
 inline juce::String versionString() { return juce::String (GACIDBASE_VERSION); }
@@ -36,14 +36,20 @@ inline constexpr const char* updateFeedUrl = "https://dakagoa.github.io/GoaSynth
 inline constexpr const char* releaseDownloadBase = "https://github.com/DakaGoa/G-AcidBase/releases/download";
 inline const juce::String changeLogUrl = juce::String(siteUrl) + "#changelog";
 
-// The asset every release attaches: the packaged Windows build, not an
-// installer that needs one. Named here rather than in the feed so a mistyped
+// The asset a release attaches and the dialog downloads: the Setup installer,
+// which puts the plugin and the standalone where the DAW looks for them, rather
+// than a folder somebody has to copy by hand. The name carries the version -
+// GitHub asset URLs are per-tag, and a versioned file cannot be mistaken for
+// another build's installer. Named here rather than in the feed so a mistyped
 // feed cannot send a click to a file that was never uploaded.
-inline juce::String installerAssetName() { return "G-AcidBase-Windows-x64.zip"; }
+inline juce::String installerAssetName (const juce::String& version)
+{
+    return "G-AcidBase-Setup-" + version + ".exe";
+}
 
 inline juce::String installerUrl (const juce::String& version)
 {
-    return juce::String (releaseDownloadBase) + "/v" + version + "/" + installerAssetName();
+    return juce::String (releaseDownloadBase) + "/v" + version + "/" + installerAssetName (version);
 }
 
 inline juce::String releaseNotesUrl (const juce::String& version)
@@ -171,7 +177,7 @@ inline UpdateMessage describe (const UpdateOutcome& outcome, const juce::String&
         // URL is far too long for the row, so it stays the link's target.
         result.downloadUrl = installerUrl (outcome.latestVersion);
         result.notesUrl = releaseNotesUrl (outcome.latestVersion);
-        result.downloadLabel = installerAssetName();
+        result.downloadLabel = installerAssetName (outcome.latestVersion);
         return result;
     }
 

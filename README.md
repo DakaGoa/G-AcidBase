@@ -9,7 +9,9 @@ After building and packaging:
 - `dist/G-AcidBase.vst3/` — **copy this entire folder**, not just its internal binary.
 - `dist/G-AcidBase.exe` — standalone instrument, with JUCE's audio/MIDI settings menu.
 - `dist/Presets/` — exactly 50 portable `.gacid` factory preset files.
-- `dist/G-AcidBase-Windows-x64.zip` — plugin, standalone, presets, logo and documentation.
+- `dist/G-AcidBase-Setup-<version>.exe` — the Windows installer: it embeds the plugin and the standalone app, installs them where DAWs look (the standard VST3 folder, elevated, or any custom folder), adds an Add/Remove-Programs entry and removes the whole thing again with `--uninstall`.
+- `dist/G-AcidBase-Windows-x64.zip` — the package: the installer, the plugin folder, the standalone, the presets, the logo and the documentation.
+- `dist/SHA256SUMS.txt` and `dist/G-AcidBase-Setup-<version>.exe.sha256` — what buyers verify the download against; they describe the published files and so are written after the ZIP, never inside it.
 - `dist/Logo/` — logo assets: `G-AcidBase-Logo.svg` plus 64/128/256/512/1024 px PNG rasters.
 - `dist/index.html` — browsable build preview with the logo, editor screenshot and 50-preset audio.
 - `artifacts/G-AcidBase-50-Preset-Demo.wav` — 75-second, 24-bit stereo preset audition at 48 kHz (1.5 seconds per preset).
@@ -29,7 +31,7 @@ The header mark is animated on top of that artwork. One cycle lasts exactly one 
 
 On its **first editor opening**, G-AcidBase automatically reads one anonymous `GET` of `https://dakagoa.github.io/GoaSynth/gacidbase/version.json` on a background thread. It shows a dialog **only when a newer release exists**; current, invalid and unreachable feeds stay silent. One session means one plugin processor instance's lifetime: closing/reopening the window, changing presets or restarting audio does not repeat the automatic request. If an update arrives while the window is closed, its notification waits for reopening and appears once. New instances get their own check. No session flag is saved in presets, and there are no automatic retries.
 
-**TOOLS → CHECK FOR UPDATES** remains an explicit fresh check and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to the new package on GitHub and to that release's notes on the product page (`gacidbase/#vX.Y.Z`). **TOOLS → CHANGE LOG** opens the full site history (`gacidbase/#changelog`); the up-to-date dialog links the running version's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
+**TOOLS → CHECK FOR UPDATES** remains an explicit fresh check and always answers in a dialog over the plugin window: the feed could not be reached, a newer release is available, or you are up to date. The update-available card carries the release date, what changed and the download size, and its two rows link straight to that release's installer on GitHub (`G-AcidBase-Setup-<version>.exe`) and to its notes on the product page (`gacidbase/#vX.Y.Z`). **TOOLS → CHANGE LOG** opens the full site history (`gacidbase/#changelog`); the up-to-date dialog links the running version's notes. Every outcome is decided by pure functions in `Source/UpdateCheck.h`, so the wording, the links and the version comparison are tested without a network.
 
 The feed is published beside the product page in the site repository. `scripts/package.py` refuses to package a build whose version the feed does not name, so the check inside a shipped plugin can never offer an update to itself or miss one that exists. It also refuses a build older than any file the plugin is compiled from (`Source/*.cpp`, `Source/*.h`, `CMakeLists.txt`), so a release cannot ship stale code behind a passing test report.
 
@@ -40,11 +42,12 @@ The header's version line (`G-AUDIO / <version>`) is a button: click it for the 
 ## Install / first sound
 
 1. Close your DAW.
-2. Copy `dist/G-AcidBase.vst3` to `%LOCALAPPDATA%\Programs\Common\VST3\` if your DAW supports this user location, or add `dist` to its custom VST3 scan paths. The machine-wide standard is `C:\Program Files\Common Files\VST3\` (Windows may ask for administrator permission when **you** copy there).
-3. Rescan plugins, then load **G-AcidBase as an instrument** on a MIDI/instrument track, not as an audio effect.
-4. Start with low monitor/headphone volume. The default is MIDI mode. Send C2 (MIDI note 36), use the on-screen keyboard, or toggle **AUDITION**.
-5. For the factory acid pattern, press **RUN** - it is the sequencer's play button and selects **SEQ** play mode whenever the plugin is sitting in MIDI mode. Select any of the 50 presets; browsing presets keeps the sequence running, each with its own factory pattern and sound. RUN is a manual latch; switch it off to stop. Choosing **MIDI** play mode stops the sequence and releases the latch.
-6. DAW tempo takes precedence over the internal tempo when available. When the host is playing, sequence phase follows host PPQ; when stopped or standalone, the internal clock runs. This is explicitly triggered by RUN or held MIDI, not automatically by the host Play button.
+2. Run `G-AcidBase-Setup-<version>.exe` and press **INSTALL**. It puts the plugin in the standard VST3 folder every DAW scans (Windows asks for administrator permission once) and the standalone app beside it. Prefer no administrator rights? Choose **Custom folder** and pick `%LOCALAPPDATA%\Programs\Common\VST3\` if your DAW scans that user location, or the unzipped package folder if you added it to your DAW's VST3 scan paths. `--silent <folder>` installs with no window at all, and **UNINSTALL** (or `--uninstall`) removes everything again.
+3. Copying by hand works just as well: `G-AcidBase.vst3` from the package into `%LOCALAPPDATA%\Programs\Common\VST3\` or another folder your DAW scans. The machine-wide standard is `C:\Program Files\Common Files\VST3\` (Windows may ask for administrator permission when **you** copy there).
+4. Rescan plugins, then load **G-AcidBase as an instrument** on a MIDI/instrument track, not as an audio effect.
+5. Start with low monitor/headphone volume. The default is MIDI mode. Send C2 (MIDI note 36), use the on-screen keyboard, or toggle **AUDITION**.
+6. For the factory acid pattern, press **RUN** - it is the sequencer's play button and selects **SEQ** play mode whenever the plugin is sitting in MIDI mode. Select any of the 50 presets; browsing presets keeps the sequence running, each with its own factory pattern and sound. RUN is a manual latch; switch it off to stop. Choosing **MIDI** play mode stops the sequence and releases the latch.
+7. DAW tempo takes precedence over the internal tempo when available. When the host is playing, sequence phase follows host PPQ; when stopped or standalone, the internal clock runs. This is explicitly triggered by RUN or held MIDI, not automatically by the host Play button.
 
 The standalone app has an **Options** button for selecting audio outputs and MIDI input devices. It does not need a DAW. If Windows warns about an unsigned executable, this local build is not code-signed; do not disable system-wide security settings.
 
@@ -125,6 +128,15 @@ ctest --test-dir build -C Release --output-on-failure
 python scripts/make_logo.py   # regenerate logo assets (only needed after editing the logo)
 python scripts/package.py
 ```
+
+Packaging builds nothing: it gates what the build produced. It refuses to package a build older than the code it claims to contain (including `Installer/`), runs the whole ctest suite, and writes `dist/G-AcidBase-Setup-<version>.exe`, the ZIP that carries it, and the checksums buyers verify it with. To publish a release, commit first and then hand the notes to the publisher:
+
+```bash
+python scripts/publish-release.py --tag v1.1.1 --notes-from-changelog <path to tools/gacidbase/CHANGELOG.md>
+python scripts/publish-release.py --verify
+```
+
+`publish-release.py` uploads the ZIP, the installer, the installer's one-line `.sha256` and `SHA256SUMS.txt` to the tag's GitHub release, and `--verify` refuses to call the release done until the site's feed names that version and all four addresses answer.
 
 Tests load the **actual VST3 bundle**, instantiate its editor and render MIDI through the wrapper. The suite also renders all 50 presets; validates finite samples, audible output, limiter bounds and DC; checks host state/pattern roundtrip; tests MIDI notes/legato/bend/panic at 44.1/48/96 kHz and 64/511/2048-sample blocks; verifies exact MIDI onset and arp start/stop. The expanded feature suite checks CC pickup/relative modes and cancellation, extended state and legacy preset migration, generator locks/scales, chains, parsed MIDI export, macro/morph/LFO audio, probability/ratchet rendering and block partitioning, undo/redo/A-B, native context-menu dismissal, panel Close/Escape and DPI transforms. Its separate report is `artifacts/feature-verification.txt`. Actual DAW drag-and-drop/automation behavior, physical high-DPI hardware and listening approval still require testing in your DAW. No unmeasured claims of hardware accuracy, anti-aliasing superiority, or “best possible” sound are made.
 

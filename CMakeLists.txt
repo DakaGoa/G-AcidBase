@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(GAcidBase VERSION 1.1.0 LANGUAGES C CXX)
+project(GAcidBase VERSION 1.1.1 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
@@ -31,3 +31,28 @@ target_sources(GAcidBaseFeatureTests PRIVATE Tests/Features.cpp)
 target_link_libraries(GAcidBaseFeatureTests PRIVATE GAcidBase juce::juce_recommended_config_flags)
 add_test(NAME GAcidBaseFeatureTests COMMAND GAcidBaseFeatureTests)
 set_tests_properties(GAcidBaseFeatureTests PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+# Buyer-facing installer (Windows): embeds the built VST3 bundle and the standalone
+# exe as RCDATA resources, then installs them to the standard VST3 folder
+# (elevated) or any custom folder, with an Add/Remove-Programs entry and a
+# --silent mode. It depends on both payloads, so a normal
+# "cmake --build build --config Release" builds everything in order.
+if(WIN32)
+    # JUCE places the artefacts under <build>/GAcidBase_artefacts/<Config>/; the
+    # installer embeds the Release payload, the one scripts/package.py ships.
+    set(GACID_ARTEFACTS "${CMAKE_BINARY_DIR}/GAcidBase_artefacts/Release")
+    set(GACID_PAYLOAD_PLUGIN     "${GACID_ARTEFACTS}/VST3/G-AcidBase.vst3/Contents/x86_64-win/G-AcidBase.vst3")
+    set(GACID_PAYLOAD_MODULEINFO "${GACID_ARTEFACTS}/VST3/G-AcidBase.vst3/Contents/Resources/moduleinfo.json")
+    set(GACID_PAYLOAD_STANDALONE "${GACID_ARTEFACTS}/Standalone/G-AcidBase.exe")
+    string(REPLACE "." "," GACID_VERSION_CSV "${PROJECT_VERSION}")
+    configure_file(Installer/installer.rc.in "${CMAKE_CURRENT_BINARY_DIR}/generated/installer.rc" @ONLY)
+    juce_add_gui_app(GAcidBaseSetup PRODUCT_NAME "G-AcidBase-Setup" COMPANY_NAME "G-Audio"
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/assets/G-AcidBase-Logo-512.png"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/assets/G-AcidBase-Logo-64.png")
+    target_sources(GAcidBaseSetup PRIVATE
+        Installer/GAcidBaseSetup.cpp
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/installer.rc")
+    target_compile_definitions(GAcidBaseSetup PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_MODAL_LOOPS_PERMITTED=0 GACIDBASE_VERSION="${PROJECT_VERSION}")
+    target_include_directories(GAcidBaseSetup PRIVATE Installer "${CMAKE_CURRENT_BINARY_DIR}/generated")
+    target_link_libraries(GAcidBaseSetup PRIVATE juce::juce_core juce::juce_gui_basics juce::juce_recommended_config_flags)
+    add_dependencies(GAcidBaseSetup GAcidBase_VST3 GAcidBase_Standalone)
+endif()
