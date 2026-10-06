@@ -8,9 +8,10 @@
 // as. Everything that decides what the result dialog says lives here as pure
 // functions, so tests/Features.cpp can check the wording, the links and the
 // version comparison without a network or a window; the fetch thread and the
-// button that starts it are in the editor.
+// manual button is in the editor; the automatic check belongs to the processor
+// session, so closing and reopening its editor never repeats the request.
 //
-// The feed is written by hand beside the page it belongs to and has the same
+// The website generates the feed from its changelog and release metadata, with the same
 // shape as GoaSynth's:
 //   { "latest": "1.1.0", "url": "...", "notes": ["..."], "released": "...",
 //     "installer_size": "4.5 MB" }
@@ -33,7 +34,7 @@ inline juce::String versionString() { return juce::String (GACIDBASE_VERSION); }
 inline constexpr const char* siteUrl = "https://dakagoa.github.io/GoaSynth/gacidbase/";
 inline constexpr const char* updateFeedUrl = "https://dakagoa.github.io/GoaSynth/gacidbase/version.json";
 inline constexpr const char* releaseDownloadBase = "https://github.com/DakaGoa/G-AcidBase/releases/download";
-inline constexpr const char* releaseNotesBase = "https://github.com/DakaGoa/G-AcidBase/releases/tag";
+inline const juce::String changeLogUrl = juce::String(siteUrl) + "#changelog";
 
 // The asset every release attaches: the packaged Windows build, not an
 // installer that needs one. Named here rather than in the feed so a mistyped
@@ -47,7 +48,7 @@ inline juce::String installerUrl (const juce::String& version)
 
 inline juce::String releaseNotesUrl (const juce::String& version)
 {
-    return juce::String (releaseNotesBase) + "/v" + version;
+    return juce::String (siteUrl) + "#v" + version;
 }
 
 // Compares versions as "major.minor.patch": <0 when a is older than b, 0 when
@@ -192,6 +193,8 @@ public:
     UpdateCheckThread (const juce::String& feedUrl, std::function<void (const UpdateOutcome&)> done)
         : juce::Thread ("gacidbase update check"), url (feedUrl), finished (std::move (done)) {}
 
+    ~UpdateCheckThread() override { stopThread(10000); }
+
     void run() override
     {
         UpdateOutcome outcome;
@@ -209,6 +212,63 @@ public:
 
     juce::String url;
     std::function<void (const UpdateOutcome&)> finished;
+};
+
+// One automatic attempt per processor instance, started on its first editor
+// opening. No state is saved in presets, no network runs on the audio thread,
+// and only a reachable/newer result is eligible for a single notification.
+// The worker owns no editor pointer: a result can wait while the window is shut.
+class SessionUpdateCheck
+{
+public:
+    explicit SessionUpdateCheck(const juce::String& url = updateFeedUrl)
+        : worker(url, [this](const UpdateOutcome& result)
+          {
+              const juce::ScopedLock guard(lock);
+              outcome=result;
+              completed=true;
+          }) {}
+
+    ~SessionUpdateCheck() { worker.stopThread(10000); }
+
+    bool startOnce()
+    {
+        const juce::ScopedLock guard(lock);
+        if(started)return false;
+        started=true; // an offline/failed attempt counts too: no hidden retries
+        if(!worker.startThread())completed=true;
+        return true;
+    }
+
+    const juce::String& feedUrl() const { return worker.url; }
+
+    bool isComplete() const
+    {
+        const juce::ScopedLock guard(lock);
+        return completed;
+    }
+
+    bool takeNotification(UpdateOutcome& result)
+    {
+        const juce::ScopedLock guard(lock);
+        if(!completed||notified||!outcome.reachable||!outcome.newer)return false;
+        notified=true;
+        result=outcome;
+        return true;
+    }
+
+    void acknowledgeNotification()
+    {
+        const juce::ScopedLock guard(lock);
+        notified=true; // a manual newer-version result also counts as notified
+    }
+
+private:
+    mutable juce::CriticalSection lock;
+    UpdateOutcome outcome;
+    bool started=false,completed=false,notified=false;
+    UpdateCheckThread worker;
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SessionUpdateCheck)
 };
 
 // The result card. A child of the editor's surface rather than a native box

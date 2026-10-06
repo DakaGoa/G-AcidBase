@@ -1,6 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 #include "AcidEngine.h"
+#include "UpdateCheck.h"
 #include <map>
 
 struct ParameterSpec
@@ -18,7 +19,7 @@ class GAcidBaseProcessor : public juce::AudioProcessor, private juce::Timer,
     private juce::AudioProcessorValueTreeState::Listener
 {
 public:
-    GAcidBaseProcessor();
+    explicit GAcidBaseProcessor(const juce::String& feedUrl = gacid::updateFeedUrl);
     ~GAcidBaseProcessor() override;
     void prepareToPlay(double, int) override;
     void releaseResources() override;
@@ -80,6 +81,8 @@ public:
     void captureComparison();
     bool switchComparison();
     bool comparisonIsB() const { return comparisonB; }
+    // Runtime-only session state; presets/host state never reset the check.
+    gacid::SessionUpdateCheck sessionUpdates;
     juce::AudioProcessorValueTreeState parameters;
     juce::MidiKeyboardState keyboard;
     std::atomic<float> leftMeter {0}, rightMeter {0};

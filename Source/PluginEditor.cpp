@@ -251,12 +251,13 @@ GAcidBaseEditor::GAcidBaseEditor(GAcidBaseProcessor& p):AudioProcessorEditor(p),
     createFeatureControls();setWantsKeyboardFocus(true);
     setResizable(true,true); setResizeLimits(960,705,5120,3760); getConstrainer()->setFixedAspectRatio(1280.0/940.0); setSize(1280,940);
     logoClockMs=juce::Time::getMillisecondCounter();
+    processor.sessionUpdates.startOnce();
     startTimerHz(25);
 }
 GAcidBaseEditor::~GAcidBaseEditor()
 {
     // Join the update fetch before anything it touches goes away.
-    if(updateThread!=nullptr)updateThread->stopThread(4000);
+    if(updateThread!=nullptr)updateThread->stopThread(10000);
     stopTimer();juce::PopupMenu::dismissAllActiveMenus(); if(audition.getToggleState())processor.audition(false); setLookAndFeel(nullptr);
 }
 void GAcidBaseEditor::showFx(int page)
@@ -353,6 +354,14 @@ void GAcidBaseEditor::paint(juce::Graphics& g)
 }
 void GAcidBaseEditor::timerCallback()
 {
+    // Quiet startup check: keep a pending update until other cards/manual
+    // checks have finished, and consume it only once across editor reopenings.
+    if(!manualUpdatePending&&!updateOverlay->isVisible()&&!aboutCard->isVisible())
+    {
+        gacid::UpdateOutcome automatic;
+        if(processor.sessionUpdates.takeNotification(automatic))
+            showUpdateResult(gacid::describe(automatic,gacid::versionString()));
+    }
     // The header mark runs one cycle per host tempo beat, and opens up with filter resonance.
     const auto now=juce::Time::getMillisecondCounter();
     const double seconds=juce::jlimit(0.0,0.25,(now-logoClockMs)/1000.0);logoClockMs=now;
@@ -401,12 +410,13 @@ void GAcidBaseEditor::saveUiSnapshot(const juce::File& file)
 //==============================================================================
 void GAcidBaseEditor::runUpdateCheck()
 {
-    if(updateThread!=nullptr&&updateThread->isThreadRunning())return;   // one shot at a time
+    if(manualUpdatePending||(updateThread!=nullptr&&updateThread->isThreadRunning()))return;
+    manualUpdatePending=true;
 
     // The callback only ever touches the editor through a SafePointer, so a
     // check that outlives the window is harmless.
     juce::Component::SafePointer<GAcidBaseEditor> safe(this);
-    updateThread=std::make_unique<gacid::UpdateCheckThread>(gacid::updateFeedUrl,[safe](const gacid::UpdateOutcome& outcome)
+    updateThread=std::make_unique<gacid::UpdateCheckThread>(processor.sessionUpdates.feedUrl(),[safe](const gacid::UpdateOutcome& outcome)
     {
         // Publish the whole result on the message thread in one go, so
         // updateCheckDone() can never read half-written state.
@@ -417,7 +427,11 @@ void GAcidBaseEditor::runUpdateCheck()
             safe->updateCheckDone();
         });
     });
-    updateThread->startThread();
+    if(!updateThread->startThread())
+    {
+        updateResult={};
+        updateCheckDone();
+    }
 }
 
 void GAcidBaseEditor::updateCheckDone()
@@ -425,7 +439,10 @@ void GAcidBaseEditor::updateCheckDone()
     // No thread teardown here: the worker may still be finishing its last
     // lines; the next check (or the destructor) joins it safely.
     //
-    // Every outcome opens this editor's own overlay - never a native box,
+    // Manual checks always answer. Automatic checks are filtered separately.
+    manualUpdatePending=false;
+    if(updateResult.reachable&&updateResult.newer)processor.sessionUpdates.acknowledgeNotification();
+    // Every manual outcome opens this editor's own overlay - never a native box,
     // never silence. A native box cannot host a link at all, which is the
     // whole reason the download row is clickable here, and an unparented
     // native box was free to land behind the DAW window, which reads as

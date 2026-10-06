@@ -123,9 +123,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout GAcidBaseProcessor::layout()
     }
     return out;
 }
-GAcidBaseProcessor::GAcidBaseProcessor()
+GAcidBaseProcessor::GAcidBaseProcessor(const juce::String& feedUrl)
     : AudioProcessor(BusesProperties().withOutput("Output",juce::AudioChannelSet::stereo(),true)),
-      parameters(*this,nullptr,"GAcidBase",layout())
+      sessionUpdates(feedUrl), parameters(*this,nullptr,"GAcidBase",layout())
 {
     int specIndex=0;
     for(const auto& s:parameterSpecs())

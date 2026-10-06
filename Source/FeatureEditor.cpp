@@ -31,8 +31,10 @@ void GAcidBaseEditor::createFeatureControls()
     about.setTooltip("About G-AcidBase - version, product page, source and release links");
     surface.addAndMakeVisible(about);about.setBounds(1090,77,166,25);about.setComponentID("about");
     about.onClick=[this]{if(aboutCard!=nullptr){aboutCard->setBounds(0,0,1280,940);aboutCard->toFront(true);aboutCard->setVisible(true);}};
-    featurePanel.addAndMakeVisible(featureTitle);featureTitle.setBounds(846,10,284,25);featureTitle.setColour(juce::Label::textColourId,cyan);
-    surface.addChildComponent(*updateOverlay);updateOverlay->setBounds(0,0,1280,940);
+    featurePanel.addAndMakeVisible(changeLog);changeLog.setBounds(846,10,110,25);changeLog.setComponentID("changeLog");
+    changeLog.setColour(juce::HyperlinkButton::textColourId,cyan);changeLog.setTooltip("Open G-AcidBase's full release history on the website");
+    featurePanel.addAndMakeVisible(featureTitle);featureTitle.setBounds(966,10,164,25);featureTitle.setColour(juce::Label::textColourId,cyan);
+    surface.addChildComponent(*updateOverlay);updateOverlay->setBounds(0,0,1280,940);updateOverlay->setComponentID("updateResult");
     surface.addChildComponent(*aboutCard);aboutCard->setBounds(0,0,1280,940);
     const auto own=[this](std::unique_ptr<juce::Component> component,int page,juce::Rectangle<int> bounds)
     {

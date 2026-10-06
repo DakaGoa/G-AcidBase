@@ -144,11 +144,13 @@ private:
     // Update check: one anonymous GET of the site's version feed on a worker
     // thread, answered in the message thread whatever the outcome.
     juce::TextButton checkUpdates {"CHECK FOR UPDATES"};
+    juce::HyperlinkButton changeLog {"CHANGE LOG", juce::URL(gacid::changeLogUrl)};
     juce::TextButton about {"G-AUDIO  /  v1.1"};
     std::unique_ptr<gacid::AboutCard> aboutCard;
     std::unique_ptr<gacid::UpdateResultOverlay> updateOverlay;
-    std::unique_ptr<juce::Thread> updateThread;
+    std::unique_ptr<gacid::UpdateCheckThread> updateThread;
     gacid::UpdateOutcome updateResult;
+    bool manualUpdatePending=false;
 
     void timerCallback() override;
     AcidKnob* addKnob(const char*,juce::Rectangle<int>);

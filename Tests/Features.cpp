@@ -365,7 +365,7 @@ int main()
             require(vectorPixels[index]>1000&&rasterPixels[index]>1000,
                     juce::String("logo palette class ")+juce::String(index)+" is present in both renders");
         }
-        auto modulationOwner=std::make_unique<GAcidBaseProcessor>();auto& modulation=*modulationOwner;
+        auto modulationOwner=std::make_unique<GAcidBaseProcessor>("http://127.0.0.1:1/nowhere");auto& modulation=*modulationOwner;
         std::unique_ptr<juce::AudioProcessorEditor> editor(modulation.createEditor());
         auto* acid=dynamic_cast<GAcidBaseEditor*>(editor.get());
         require(acid!=nullptr,"editor creates for DPI checks");
@@ -481,8 +481,10 @@ int main()
         require(gacid::compareVersions("1.1.0","v1.2")>0,"a malformed feed version cannot outrank the build");
         require(gacid::installerUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/download/v1.2.0/G-AcidBase-Windows-x64.zip",
                 "the download link points at the released package");
-        require(gacid::releaseNotesUrl("1.2.0")=="https://github.com/DakaGoa/G-AcidBase/releases/tag/v1.2.0",
-                "the notes link points at the release");
+        require(gacid::releaseNotesUrl("1.2.0")=="https://dakagoa.github.io/GoaSynth/gacidbase/#v1.2.0",
+                "the notes link deep-links to the site's matching release heading");
+        require(gacid::changeLogUrl=="https://dakagoa.github.io/GoaSynth/gacidbase/#changelog",
+                "Change Log opens the full site history");
         const auto feed=[](const juce::String& json){return juce::JSON::parse(json);};
         const auto full=gacid::readFeed(feed("{\"latest\":\"9.9.9\",\"released\":\"5 October 2026\",\"installer_size\":\"4.5 MB\",\"notes\":[\"first\",\"\",\"  \",\"second\",\"third\",\"fourth\",\"fifth\"]}"),gacid::versionString());
         require(full.reachable&&full.newer,"a newer feed is reachable and offers an update");
@@ -506,8 +508,9 @@ int main()
         require(dead.title=="G-ACIDBASE"&&dead.message.contains("Could not reach the update feed")&&dead.downloadUrl==gacid::siteUrl
                 &&dead.notesUrl.isEmpty(),"an unreachable feed says so and points at the site");
         const auto current=gacid::describe(gacid::readFeed(feed("{\"latest\":\"1.1.0\"}"),gacid::versionString()),gacid::versionString());
-        require(current.message.contains("You are running the latest version")&&current.downloadUrl.isEmpty(),
-                "an up-to-date build has nothing to download");
+        require(current.message.contains("You are running the latest version")&&current.downloadUrl.isEmpty()
+                &&current.notesUrl==gacid::releaseNotesUrl(gacid::versionString()),
+                "an up-to-date build links its own site notes and has nothing to download");
         // The dialog itself: the rows sit inside the card, the download row
         // names its file, and the card hides when there is nothing to offer.
         gacid::UpdateResultOverlay overlay;
@@ -602,6 +605,144 @@ int main()
             require(answeredAgain.load()&&!missing.reachable,
                     "a feed that cannot be fetched reports unreachable");
         }
+        // Automatic checks run once per processor session, survive a closed
+        // editor, and only show a card for newer versions. Drive actual editor
+        // timers/buttons against a loopback feed; no live internet dependency.
+        {
+            struct SessionFeedServer : juce::Thread
+            {
+                explicit SessionFeedServer(juce::String body)
+                    : juce::Thread("session feed server"),payload(std::move(body))
+                {
+                    require(listener.createListener(0,"127.0.0.1"),"session feed listener starts");
+                    port=listener.getBoundPort();
+                    startThread();
+                }
+                ~SessionFeedServer() override { signalThreadShouldExit();stopThread(2000); }
+                void run() override
+                {
+                    while(!threadShouldExit())
+                    {
+                        if(listener.waitUntilReady(true,100)<=0)continue;
+                        std::unique_ptr<juce::StreamingSocket> client(listener.waitForNextConnection());
+                        if(client==nullptr)continue;
+                        if(client->waitUntilReady(true,1000)<=0)continue;
+                        char request[2048];client->read(request,static_cast<int>(sizeof(request)),false);
+                        const juce::String response="HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                            +juce::String(payload.getNumBytesAsUTF8())+"\r\nConnection: close\r\n\r\n"+payload;
+                        client->write(response.toRawUTF8(),static_cast<int>(response.getNumBytesAsUTF8()));
+                        requests.fetch_add(1);
+                    }
+                }
+                juce::String url() const { return "http://127.0.0.1:"+juce::String(port)+"/version.json"; }
+                juce::StreamingSocket listener;
+                juce::String payload;
+                int port=0;
+                std::atomic<int> requests {0};
+            };
+            const auto waitFor=[&](const std::function<bool()>& done)
+            {
+                const auto deadline=GetTickCount64()+6000;
+                while(!done()&&GetTickCount64()<deadline)pumpMessagesFor(20);
+                require(done(),"session update check completes within deadline");
+            };
+            const auto resultCard=[](juce::AudioProcessorEditor& view)
+            {
+                auto* surface=view.getChildComponent(0);
+                return dynamic_cast<gacid::UpdateResultOverlay*>(surface->findChildWithID("updateResult"));
+            };
+            const auto manualButton=[](juce::Component& view, const auto& self)->juce::Button*
+            {
+                if(view.getComponentID()=="checkUpdates")return dynamic_cast<juce::Button*>(&view);
+                for(int i=0;i<view.getNumChildComponents();++i)
+                    if(auto* found=self(*view.getChildComponent(i),self))return found;
+                return nullptr;
+            };
+            for(const juce::String& latest:{juce::String("9.9.9"),gacid::versionString(),juce::String("invalid")})
+            {
+                SessionFeedServer server("{\"latest\":\""+latest+"\"}");
+                auto owner=std::make_unique<GAcidBaseProcessor>(server.url());
+                std::unique_ptr<juce::AudioProcessorEditor> view(owner->createEditor());
+                auto* card=resultCard(*view);require(card!=nullptr,"editor parents the update result card");
+                waitFor([&]{return owner->sessionUpdates.isComplete();});pumpMessagesFor(100);
+                const bool newer=latest=="9.9.9";
+                require(card->isVisible()==newer,"automatic result is visible only for a newer release");
+                if(newer)
+                {
+                    require(card->titleLabel.getText()=="UPDATE AVAILABLE"
+                            &&card->downloadLink.getURL().toString(true)==gacid::installerUrl(latest),
+                            "automatic update card links the offered release");
+                    card->okButton.triggerClick();pumpMessagesFor(60);
+                }
+                require(server.requests.load()==1,"first editor opening makes one automatic GET");
+                require(!owner->sessionUpdates.startOnce(),"a completed automatic check cannot restart");
+                view.reset();view.reset(owner->createEditor());pumpMessagesFor(120);
+                card=resultCard(*view);
+                require(server.requests.load()==1&&!card->isVisible(),"editor reopening neither fetches nor repeats a notification");
+                owner->setCurrentProgram(4);owner->prepareToPlay(48000,64);pumpMessagesFor(60);
+                require(server.requests.load()==1,"preset changes and audio preparation do not reset the session check");
+                auto* manual=manualButton(*view,manualButton);require(manual!=nullptr,"manual check button is available");
+                manual->triggerClick();pumpMessagesFor(40);
+                waitFor([&]{return card->isVisible();});
+                require(server.requests.load()==2,"manual check still makes a fresh request");
+                require(card->titleLabel.getText()==(newer?"UPDATE AVAILABLE":"G-ACIDBASE"),
+                        "manual check still shows newer, up-to-date and unreachable outcomes");
+                card->okButton.triggerClick();pumpMessagesFor(60);
+                require(!card->isVisible(),"manual notification does not resurrect an automatic one");
+            }
+            // Close before completion: the processor owns the worker/result.
+            SessionFeedServer server("{\"latest\":\"9.9.9\"}");
+            auto owner=std::make_unique<GAcidBaseProcessor>(server.url());
+            std::unique_ptr<juce::AudioProcessorEditor> view(owner->createEditor());
+            view.reset();waitFor([&]{return owner->sessionUpdates.isComplete();});
+            view.reset(owner->createEditor());pumpMessagesFor(100);
+            require(server.requests.load()==1&&resultCard(*view)->isVisible(),
+                    "a newer result fetched while closed appears on reopen without another request");
+            view.reset();owner.reset();
+            auto nextSession=std::make_unique<GAcidBaseProcessor>(server.url());
+            view.reset(nextSession->createEditor());
+            waitFor([&]{return nextSession->sessionUpdates.isComplete();});pumpMessagesFor(100);
+            require(server.requests.load()==2&&resultCard(*view)->isVisible(),"a fresh processor session checks again");
+            view.reset();nextSession.reset();
+            auto offline=std::make_unique<GAcidBaseProcessor>("http://127.0.0.1:1/nowhere");
+            view.reset(offline->createEditor());
+            waitFor([&]{return offline->sessionUpdates.isComplete();});pumpMessagesFor(100);
+            require(!resultCard(*view)->isVisible(),"a failed automatic connection stays silent");
+            auto* manual=manualButton(*view,manualButton);require(manual!=nullptr,"offline manual check button exists");
+            manual->triggerClick();pumpMessagesFor(40);
+            waitFor([&]{return resultCard(*view)->isVisible();});
+            require(resultCard(*view)->messageLabel.getText().contains("Could not reach the update feed"),
+                    "a failed manual connection still explains the error");
+            view.reset();
+        }
+        // The Change Log item is a native hyperlink with the full-history URL,
+        // alongside Check for Updates on every TOOLS page, without overlap.
+        juce::HyperlinkButton* changeLog=nullptr;
+        juce::Component* checkUpdates=nullptr;
+        juce::Component* featureClose=nullptr;
+        std::function<void(juce::Component&)> findReleaseControls=[&](juce::Component& c)
+        {
+            if(c.getComponentID()=="changeLog")changeLog=dynamic_cast<juce::HyperlinkButton*>(&c);
+            if(c.getComponentID()=="checkUpdates")checkUpdates=&c;
+            if(c.getComponentID()=="featureClose")featureClose=&c;
+            for(int i=0;i<c.getNumChildComponents();++i)findReleaseControls(*c.getChildComponent(i));
+        };
+        findReleaseControls(*editor);
+        require(changeLog!=nullptr&&checkUpdates!=nullptr&&featureClose!=nullptr,
+                "TOOLS contains Change Log, update check and Close controls");
+        require(changeLog->getButtonText()=="CHANGE LOG"&&changeLog->getURL().toString(true)==gacid::changeLogUrl,
+                "Change Log item uses the full-history website link");
+        for(int page=0;page<4;++page)
+        {
+            acid->showFeaturePage(page);
+            require(changeLog->isVisible()&&changeLog->getParentComponent()->isVisible(),
+                    "Change Log remains available on every TOOLS page");
+            require(changeLog->getParentComponent()->getLocalBounds().contains(changeLog->getBounds())
+                    &&!changeLog->getBounds().intersects(checkUpdates->getBounds())
+                    &&!changeLog->getBounds().intersects(featureClose->getBounds()),
+                    "Change Log fits the tools header without overlapping adjacent actions");
+        }
+        acid->closePanels();
         // About card: the version it shows is the build's own, and each row goes to
         // exactly one address - the product page, the source repository, the
         // current release. Nothing here is read from the network.
@@ -795,7 +936,7 @@ int main()
         require(acid->keyPressed(juce::KeyPress(juce::KeyPress::escapeKey))&&!acid->isPanelOpen()&&modulation.getMidiLearnParameter()<0,"Escape closes learn panel and cancels waiting learn");
         acid->beginMidiLearnFor("cutoff");clickUI("CLOSE");require(!acid->isPanelOpen(),"matrix Close restores FX controls");
         editor->removeFromDesktop();
-        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, sequencer RUN transport (play engages SEQ, presets keep playback, MIDI releases the latch), CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, About card links and dismissal, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
+        const juce::String report="G-AcidBase expanded feature verification\nFailures: 0\nMIDI learn/cancel, pickup, both relative encoder modes, macro/morph/chain/step state, generator scale and locks, undo/redo/A-B and Windows shortcuts, bounded exact-length MIDI file parsing, macro/morph/LFO audio, chance/ratchet rendering and block invariance, sequencer RUN transport (play engages SEQ, presets keep playback, MIDI releases the latch), CC1 vibrato, audition, host PPQ seeks, dense automation at 44.1/48/96 kHz, native right-click/Escape, panel Close/Escape, DPI, logo/raster agreement and header lockup, animated header logo (tempo phase, resonance response, no spill), update-check version comparison and all three result dialogs, quiet once-per-instance automatic checks (newer/current/offline, manual override, editor reopen), Change Log item and site version deep-links, About card links and dismissal, full-width piano geometry and audible native right-edge key.\nDAW drag/drop and physical high-DPI hardware require manual host testing.\n";
         juce::File::getCurrentWorkingDirectory().getChildFile("artifacts/feature-verification.txt").replaceWithText(report);
         std::cout<<report;
 
